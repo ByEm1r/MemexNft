@@ -54,29 +54,32 @@ export const Purchase: React.FC = () => {
       console.error('Supabase insert error:', error);
       alert('Kayıt başarısız oldu: ' + error.message);
     } else {
-      // Telegram bildirimi gönder
-      await fetch(`https://api.telegram.org/bot8054898051:AAHqcPNd5iGbMIyVa3X9d-dOkVplWDTEILs/sendPhoto`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    chat_id: '-1002504090329',
-    photo: nft.image || 'https://placehold.co/600x400?text=NFT+Image',
-    caption: `🔥 *New NFT Order Alert!* 🔥
+      const chatIds = ['-1002504090329', '-1002434790072', '-1002370646546'];
+
+      for (const chatId of chatIds) {
+        await fetch(`https://api.telegram.org/bot8054898051:AAHqcPNd5iGbMIyVa3X9d-dOkVplWDTEILs/sendPhoto`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: chatId, //
+            photo: nft.image || 'https://placehold.co/600x400?text=NFT+Image',
+            caption: `🔥 *New NFT Order Alert!* 🔥
 
 🎨 *NFT Title:* ${nft.title}
 💰 *Price:* ${formatPrice(nft.price)} MemeX
 👛 *Wallet:* \`${walletAddress}\`
 
 🌐 [View on Marketplace](https://nft.memextoken.org/)`,
-    parse_mode: 'Markdown',
-  }),
-})
-.then((res) => res.json())
-.then((data) => console.log('Telegram API yanıtı:', data))
-.catch((err) => console.error('Telegram mesaj hatası:', err));
-         
+            parse_mode: 'Markdown',
+          }),
+        })
+            .then((res) => res.json())
+            .then((data) => console.log(`✅ Mesaj gönderildi (chatId: ${chatId}):`, data))
+            .catch((err) => console.error(`❌ Hata (chatId: ${chatId}):`, err));
+      }
+
 
       if (incrementSoldCount) {
         incrementSoldCount(nft.id);
