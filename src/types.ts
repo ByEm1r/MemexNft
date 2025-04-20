@@ -4,8 +4,10 @@ export interface NFT {
   description: string;
   image: string;
   price: number;
+  priceXEP?: number;
   mintCount: number;
   soldCount: number;
+  creator?: string;
 }
 
 export interface Order {
@@ -15,5 +17,5 @@ export interface Order {
   walletAddress: string;
   purchaseDate: string;
   status: string;
-  nftId: string;
+  nftId?: string;
 }

@@ -7,20 +7,11 @@ export default defineConfig({
     include: ['lucide-react', 'uuid'],
   },
   server: {
-    proxy: {
-      '/data': 'http://localhost:3000',
-      'ws://nft.memextoken.org:24678': {
-        target: 'wss://nft.memextoken.org:24678',
-        secure: true,
-        ws: true,
-      }
-    },
+    port: 3000,
+    open: true,
     hmr: {
       overlay: false,
-      protocol: 'ws',
     },
-    allowedHosts: ["nft.memextoken.org"],
-    https: true,
   },
   build: {
     outDir: 'dist',

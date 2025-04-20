@@ -21,14 +21,16 @@ interface StoreState {
   loadInitialData: () => Promise<void>;
   saveData: () => Promise<void>;
   formatPrice: (price: number) => string;
+  deleteOrder: (id: string) => void;
 }
 
-export const useStore = create<StoreState>((set, get) => ({
+export const useStore = create<StoreState>((set) => ({
   nfts: [],
   orders: [],
   pendingBurn: 0,
   burnedAmount: 0,
   isAuthenticated: false,
+
   login: (username, password) => {
     if (username === 'PlanC' && password === 'Ceyhun8387@') {
       set({ isAuthenticated: true });
@@ -36,62 +38,92 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     return false;
   },
+
   logout: () => set({ isAuthenticated: false }),
+
   addNFT: (nft) => {
-    const newNFT: NFT = { id: uuidv4(), soldCount: 0, ...nft };
+    const newNFT: NFT = {
+      id: uuidv4(),
+      soldCount: 0,
+      ...nft,
+    };
     set((state) => ({ nfts: [...state.nfts, newNFT] }));
+    supabase.from('nft_items').insert([newNFT]); // async değil, beklenmiyor
   },
+
   updateNFT: (id, updates) => {
     set((state) => ({
       nfts: state.nfts.map((nft) => (nft.id === id ? { ...nft, ...updates } : nft)),
     }));
+    supabase.from('nft_items').update(updates).eq('id', id);
   },
+
   deleteNFT: (id) => {
     set((state) => ({ nfts: state.nfts.filter((nft) => nft.id !== id) }));
+    supabase.from('nft_items').delete().eq('id', id);
   },
-  addOrder: async (order) => {
+
+  deleteOrder: (id) => {
+    set((state) => ({
+      orders: state.orders.filter((order) => order.id !== id),
+    }));
+    supabase.from('nft_orders').delete().eq('id', id);
+  },
+
+
+  addOrder: (order) => {
     const newOrder: Order = { id: uuidv4(), ...order };
     set((state) => ({ orders: [...state.orders, newOrder] }));
-    await supabase.from('nft_orders').insert([newOrder]);
+    supabase.from('nft_orders').insert([newOrder]);
   },
+
   updateOrder: (id, updates) => {
     set((state) => ({
       orders: state.orders.map((order) => (order.id === id ? { ...order, ...updates } : order)),
     }));
+    supabase.from('nft_orders').update(updates).eq('id', id);
   },
+
   updatePendingBurn: (amount) => {
     set((state) => ({ pendingBurn: state.pendingBurn + amount }));
   },
+
   updateBurnedAmount: (amount) => {
     set({ burnedAmount: amount });
   },
+
   loadInitialData: async () => {
     try {
       const { data: nftData, error: nftError } = await supabase
-  .from('nft_items')
-  .select('*')
-  .order('title', { ascending: true });
+          .from('nft_items')
+          .select('*')
+          .order('title', { ascending: true });
 
-      const { data: ordersData, error: ordersError } = await supabase.from('nft_orders').select('*');
+      const { data: ordersData, error: ordersError } = await supabase
+          .from('nft_orders')
+          .select('*')
+          .order('purchaseDate', { ascending: false });
 
       if (nftError || ordersError) {
-        console.error('Supabase veri çekme hatası:', nftError || ordersError);
+        console.error('Veri çekme hatası:', nftError || ordersError);
         return;
       }
 
       set({
-        nfts: nftData || [],
-        orders: ordersData || [],
+        nfts: (nftData as NFT[]) || [],
+        orders: (ordersData as Order[]) || [],
         pendingBurn: 0,
         burnedAmount: 0,
       });
     } catch (error) {
-      console.error('Supabase genel hata:', error);
+      console.error('loadInitialData genel hata:', error);
     }
   },
+
   saveData: async () => {
-    console.log('Supabase yapısı aktif, saveData devre dışı.');
+    console.log('Supabase ile çalışılıyor, saveData gerekli değil.');
   },
+
   formatPrice: (price: number) => {
     return price.toLocaleString(undefined, {
       minimumFractionDigits: 2,
