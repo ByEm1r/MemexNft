@@ -3,49 +3,70 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { useStore } from './store';
+import { supabase } from './supabaseClient';
+import { NFT, Order } from './types';
 
 function Root() {
-  const { loadInitialData } = useStore();
+    const {
+        loadInitialData,
+        updateNFT,
+        addNFT,
+        deleteNFT,
+        addOrder,
+        updateOrder,
+        deleteOrder,
+    } = useStore();
 
-  useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+    const setupSupabaseRealtime = () => {
+        const nftChannel = supabase
+            .channel('realtime-nft-items')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'nft_items' },
+                (payload: { eventType: string; old: Partial<NFT>; new: Partial<NFT> }) => {
+                    const id = payload.old?.id ?? payload.new?.id;
+                    if (!id) return;
 
-  // Function to establish WebSocket connection
-  const setupWebSocket = () => {
-    const token = 'A-WR1onrC2rm';
-    const wsUrl = `wss://nft.memextoken.org:24678/?token=${token}`; // Use wss
-    const ws = new WebSocket(wsUrl);
+                    if (payload.eventType === 'INSERT' && payload.new) addNFT(payload.new as NFT);
+                    else if (payload.eventType === 'UPDATE' && payload.new) updateNFT(id, payload.new as NFT);
+                    else if (payload.eventType === 'DELETE') deleteNFT(id);
+                }
+            )
+            .subscribe();
 
-    ws.onopen = () => {
-      console.log('WebSocket connected in main.tsx');
+        const orderChannel = supabase
+            .channel('realtime-nft-orders')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'nft_orders' },
+                (payload: { eventType: string; old: Partial<Order>; new: Partial<Order> }) => {
+                    const id = payload.old?.id ?? payload.new?.id;
+                    if (!id) return;
+
+                    if (payload.eventType === 'INSERT' && payload.new) addOrder(payload.new as Order);
+                    else if (payload.eventType === 'UPDATE' && payload.new) updateOrder(id, payload.new as Order);
+                    else if (payload.eventType === 'DELETE') deleteOrder(id);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            nftChannel.unsubscribe();
+            orderChannel.unsubscribe();
+        };
     };
 
-    ws.onmessage = (event) => {
-      console.log('Received in main.tsx:', event.data);
-    };
+    useEffect(() => {
+        loadInitialData();
+        const cleanup = setupSupabaseRealtime();
+        return cleanup;
+    }, []);
 
-    ws.onclose = (event) => {
-      console.log('WebSocket disconnected in main.tsx', event.code, event.reason);
-      // Attempt to reconnect after a delay
-      setTimeout(setupWebSocket, 3000);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error in main.tsx:', error);
-    };
-  };
-
-  useEffect(() => {
-    loadInitialData();
-    setupWebSocket(); // Call WebSocket setup
-  }, []);
-
-  return <App />;
+    return <App />;
 }
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <Root />
+        <Root />
     </StrictMode>
 );

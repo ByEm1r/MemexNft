@@ -9,6 +9,10 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    proxy: {
+      // Sadece HTTP istekleri için
+      '/data': 'http://localhost:3000',
+    },
     hmr: {
       overlay: false,
     },

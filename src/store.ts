@@ -11,20 +11,21 @@ interface StoreState {
   isAuthenticated: boolean;
   login: (username: string, password: string) => boolean;
   logout: () => void;
-  addNFT: (nft: Omit<NFT, 'id' | 'soldCount'>) => void;
-  updateNFT: (id: string, updates: Partial<NFT>) => void;
-  deleteNFT: (id: string) => void;
-  addOrder: (order: Omit<Order, 'id'>) => void;
-  updateOrder: (id: string, updates: Partial<Order>) => void;
+  addNFT: (nft: Omit<NFT, 'id' | 'soldCount'>) => Promise<void>;
+  updateNFT: (id: string, updates: Partial<NFT>) => Promise<void>;
+  deleteNFT: (id: string) => Promise<void>;
+  addOrder: (order: Omit<Order, 'id'>) => Promise<void>;
+  updateOrder: (id: string, updates: Partial<Order>) => Promise<void>;
+  deleteOrder: (id: string) => Promise<void>;
+  incrementSoldCount: (id: string) => Promise<void>; // <-- 🔥 Bunu ekledik
   updatePendingBurn: (amount: number) => void;
   updateBurnedAmount: (amount: number) => void;
   loadInitialData: () => Promise<void>;
   saveData: () => Promise<void>;
   formatPrice: (price: number) => string;
-  deleteOrder: (id: string) => void;
 }
 
-export const useStore = create<StoreState>((set) => ({
+export const useStore = create<StoreState>((set, get) => ({
   nfts: [],
   orders: [],
   pendingBurn: 0,
@@ -41,47 +42,68 @@ export const useStore = create<StoreState>((set) => ({
 
   logout: () => set({ isAuthenticated: false }),
 
-  addNFT: (nft) => {
+  addNFT: async (nft) => {
     const newNFT: NFT = {
       id: uuidv4(),
       soldCount: 0,
       ...nft,
     };
     set((state) => ({ nfts: [...state.nfts, newNFT] }));
-    supabase.from('nft_items').insert([newNFT]); // async değil, beklenmiyor
+    const { error } = await supabase.from('nft_items').insert([newNFT]);
+    if (error) console.error('NFT ekleme hatası:', error);
   },
 
-  updateNFT: (id, updates) => {
+  updateNFT: async (id, updates) => {
     set((state) => ({
       nfts: state.nfts.map((nft) => (nft.id === id ? { ...nft, ...updates } : nft)),
     }));
-    supabase.from('nft_items').update(updates).eq('id', id);
+    const { error } = await supabase.from('nft_items').update(updates).eq('id', id);
+    if (error) console.error('NFT güncelleme hatası:', error);
   },
 
-  deleteNFT: (id) => {
+  deleteNFT: async (id) => {
     set((state) => ({ nfts: state.nfts.filter((nft) => nft.id !== id) }));
-    supabase.from('nft_items').delete().eq('id', id);
+    const { error } = await supabase.from('nft_items').delete().eq('id', id);
+    if (error) console.error('NFT silme hatası:', error);
   },
 
-  deleteOrder: (id) => {
+  deleteOrder: async (id) => {
     set((state) => ({
       orders: state.orders.filter((order) => order.id !== id),
     }));
-    supabase.from('nft_orders').delete().eq('id', id);
+    const { error } = await supabase.from('nft_orders').delete().eq('id', id);
+    if (error) console.error('Sipariş silme hatası:', error);
   },
 
-
-  addOrder: (order) => {
+  addOrder: async (order) => {
     const newOrder: Order = { id: uuidv4(), ...order };
     set((state) => ({ orders: [...state.orders, newOrder] }));
-    supabase.from('nft_orders').insert([newOrder]);
+    const { error } = await supabase.from('nft_orders').insert([newOrder]);
+    if (error) console.error('Sipariş ekleme hatası:', error);
   },
 
-  updateOrder: (id, updates) => {
+  updateOrder: async (id, updates) => {
     set((state) => ({
       orders: state.orders.map((order) => (order.id === id ? { ...order, ...updates } : order)),
     }));
-    supabase.from('nft_orders').update(updates).eq('id', id);
+    const { error } = await supabase.from('nft_orders').update(updates).eq('id', id);
+    if (error) console.error('Sipariş güncelleme hatası:', error);
+  },
+
+  // 🔥 Yeni fonksiyon burada
+  incrementSoldCount: async (id) => {
+    const currentNFT = get().nfts.find((n) => n.id === id);
+    if (!currentNFT) return;
+    const newSoldCount = currentNFT.soldCount + 1;
+
+    set((state) => ({
+      nfts: state.nfts.map((n) =>
+          n.id === id ? { ...n, soldCount: newSoldCount } : n
+      ),
+    }));
+
+    const { error } = await supabase.from('nft_items').update({ soldCount: newSoldCount }).eq('id', id);
+    if (error) console.error('soldCount güncellenemedi:', error);
   },
 
   updatePendingBurn: (amount) => {
